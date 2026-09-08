@@ -37,10 +37,18 @@ class Settings(BaseSettings):
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_db_url(cls, v: str) -> str:
-        if v and v.startswith("postgres://"):
-            return v.replace("postgres://", "postgresql+asyncpg://", 1)
-        if v and v.startswith("postgresql://"):
-            return v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        if not v:
+            return v
+        # Fix dialect prefix for async support
+        if v.startswith("postgres://"):
+            v = v.replace("postgres://", "postgresql+asyncpg://", 1)
+        elif v.startswith("postgresql://"):
+            v = v.replace("postgresql://", "postgresql+asyncpg://", 1)
+        # Strip SSL params from URL — they are passed via connect_args instead
+        import re
+        v = re.sub(r"[?&](ssl|sslmode)=[^&]*", "", v)
+        # Clean up leftover ? or & at the end
+        v = v.rstrip("?&")
         return v
 
     # Redis

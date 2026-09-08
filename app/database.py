@@ -1,3 +1,4 @@
+import ssl as ssl_module
 from typing import AsyncGenerator
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.orm import declarative_base
@@ -7,6 +8,12 @@ from app.config import settings
 connect_args = {}
 if settings.DATABASE_URL.startswith("sqlite"):
     connect_args["check_same_thread"] = False
+elif "asyncpg" in settings.DATABASE_URL:
+    # asyncpg requires SSL to be passed via connect_args, not the URL
+    ssl_ctx = ssl_module.create_default_context()
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode = ssl_module.CERT_NONE
+    connect_args["ssl"] = ssl_ctx
 
 engine = create_async_engine(
     settings.DATABASE_URL,
