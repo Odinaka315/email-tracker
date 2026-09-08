@@ -1,5 +1,6 @@
 import json
-from typing import List, Union
+import os
+from typing import List, Optional, Union
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -7,18 +8,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Email Open Alert API"
     API_V1_STR: str = "/api/v1"
-    DEBUG: bool = True
+    DEBUG: bool = False
     HOST: str = "0.0.0.0"
-    PORT: int = 8000
+    PORT: int = int(os.environ.get("PORT", 8000))
     BASE_URL: str = "http://localhost:8000"
 
     # CORS
-    BACKEND_CORS_ORIGINS: Union[List[str], str] = [
-        "http://localhost:3000",
-        "http://localhost:5173",
-        "http://localhost:8000",
-        "*",
-    ]
+    BACKEND_CORS_ORIGINS: Union[List[str], str] = ["*"]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
     @classmethod
@@ -31,14 +27,17 @@ class Settings(BaseSettings):
             return v
         return ["*"]
 
-    # Database
-    DATABASE_URL: str = "sqlite+aiosqlite:///./email_alerts.db"
+    # Database — no default so the app fails fast if DATABASE_URL is missing
+    DATABASE_URL: str
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod
     def assemble_db_url(cls, v: str) -> str:
         if not v:
-            return v
+            raise ValueError(
+                "DATABASE_URL must be set. "
+                "Set it in .env (local) or as an environment variable (production)."
+            )
         # Fix dialect prefix for async support
         if v.startswith("postgres://"):
             v = v.replace("postgres://", "postgresql+asyncpg://", 1)
@@ -57,9 +56,9 @@ class Settings(BaseSettings):
 
     # Alert Behavior
     ALERT_ON_FIRST_OPEN_ONLY: bool = False
-    
+
     # Email Sending
-    BREVO_API_KEY: str | None = None
+    BREVO_API_KEY: Optional[str] = None
 
     model_config = SettingsConfigDict(
         env_file=".env",
