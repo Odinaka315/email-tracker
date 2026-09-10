@@ -15,7 +15,7 @@ class TrackedEmailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    index: int
+    index: Optional[int] = None
     sender_id: str
     tracking_token: str
     recipient_email: str
@@ -26,8 +26,8 @@ class TrackedEmailResponse(BaseModel):
     first_opened_at: Optional[datetime] = None
     last_opened_at: Optional[datetime] = None
     meta_data: Optional[Dict[str, Any]] = None
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
     tracking_pixel_url: Optional[str] = None
     tracking_pixel_html: Optional[str] = None
     injected_html: Optional[str] = None
@@ -37,7 +37,7 @@ class OpenEventResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
-    index: int
+    index: Optional[int] = None
     tracked_email_id: str
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None

@@ -15,3 +15,5 @@ services:
         value: "False"
       - key: PYTHON_VERSION
         value: "3.14.3"
+      - key: PYTHONUNBUFFERED
+        value: "1"

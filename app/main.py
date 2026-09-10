@@ -1,7 +1,12 @@
 import asyncio
 import logging
+import sys
+import time
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import JSONResponse
+from fastapi.exceptions import RequestValidationError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.database import init_db
@@ -9,11 +14,19 @@ from app.websockets.manager import ws_manager
 from app.websockets.redis_pubsub import redis_manager
 from app.api.v1 import api_v1_router
 
+# Ensure stdout and stderr flush immediately — critical for Render real-time logs
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(line_buffering=True)
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(line_buffering=True)
+
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
+    stream=sys.stdout,
+    force=True,
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("email_alerts")
 
 
 async def _background_init_db():
@@ -21,7 +34,7 @@ async def _background_init_db():
     try:
         await init_db()
     except Exception as e:
-        logger.error(f"Background database initialization failed: {e}")
+        logger.error(f"Background database initialization failed: {e}", exc_info=True)
 
 
 @asynccontextmanager
@@ -47,6 +60,57 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Request logging middleware to provide clear visibility on Render
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    logger.info(f"--> {request.method} {request.url.path}")
+    try:
+        response = await call_next(request)
+        duration_ms = (time.time() - start_time) * 1000
+        logger.info(f"<-- {request.method} {request.url.path} {response.status_code} ({duration_ms:.1f}ms)")
+        return response
+    except Exception as e:
+        duration_ms = (time.time() - start_time) * 1000
+        logger.exception(f"<-- {request.method} {request.url.path} FAILED ({duration_ms:.1f}ms): {e}")
+        raise
+
+
+# Catch-all exception handler to make 500 errors immediately diagnosable
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
+        headers=getattr(exc, "headers", None),
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning(f"Validation error on {request.method} {request.url.path}: {exc.errors()}")
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()},
+    )
+
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    logger.error(
+        f"CRITICAL 500 ERROR on {request.method} {request.url.path}: {exc}",
+        exc_info=True,
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "Internal Server Error",
+            "error_type": exc.__class__.__name__,
+            "message": str(exc),
+        },
+    )
+
 
 # Configure CORS
 origins = settings.BACKEND_CORS_ORIGINS

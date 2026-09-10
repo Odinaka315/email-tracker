@@ -26,6 +26,7 @@ def _format_email_response(email: TrackedEmail, base_url: str = None) -> Tracked
     pixel_html = generate_tracking_pixel_html(email.tracking_token, base_url)
     return TrackedEmailResponse(
         id=email.id,
+        index=email.index,
         sender_id=email.sender_id,
         tracking_token=email.tracking_token,
         recipient_email=email.recipient_email,

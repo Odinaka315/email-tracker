@@ -1,20 +1,20 @@
 import uuid
-from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, Sequence, func
+from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, Sequence, func, FetchedValue
 from sqlalchemy.orm import relationship
 from app.database import Base
 
-open_events_index_seq = Sequence('open_events_index_seq')
-click_events_index_seq = Sequence('click_events_index_seq')
+open_events_index_seq = Sequence('open_events_index_seq', optional=True)
+click_events_index_seq = Sequence('click_events_index_seq', optional=True)
 
 
 class OpenEvent(Base):
     __tablename__ = "open_events"
 
-    index = Column(Integer, open_events_index_seq, server_default=open_events_index_seq.next_value(), unique=True, nullable=False)
+    index = Column(Integer, open_events_index_seq, server_default=FetchedValue(), unique=True, nullable=True)
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     tracked_email_id = Column(String(36), ForeignKey("tracked_emails.id", ondelete="CASCADE"), nullable=False, index=True)
     
-    ip_address = Column(String(64), nullable=True)
+    ip_address = Column(String(45), nullable=True)
     user_agent = Column(String(1000), nullable=True)
     device_type = Column(String(50), default="UNKNOWN", nullable=False)
     client_name = Column(String(100), nullable=True)
@@ -22,7 +22,7 @@ class OpenEvent(Base):
     
     is_bot = Column(Boolean, default=False, nullable=False)
     is_proxy = Column(Boolean, default=False, nullable=False)
-    proxy_type = Column(String(100), nullable=True)
+    proxy_type = Column(String(50), nullable=True)
     
     country = Column(String(100), nullable=True)
     city = Column(String(100), nullable=True)
@@ -36,7 +36,7 @@ class OpenEvent(Base):
 class ClickEvent(Base):
     __tablename__ = "click_events"
 
-    index = Column(Integer, click_events_index_seq, server_default=click_events_index_seq.next_value(), unique=True, nullable=False)
+    index = Column(Integer, click_events_index_seq, server_default=FetchedValue(), unique=True, nullable=True)
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     tracked_email_id = Column(String(36), ForeignKey("tracked_emails.id", ondelete="CASCADE"), nullable=False, index=True)
     
