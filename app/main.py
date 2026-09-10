@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -15,16 +16,26 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+async def _background_init_db():
+    """Run database initialization in the background so the port binds immediately."""
+    try:
+        await init_db()
+    except Exception as e:
+        logger.error(f"Background database initialization failed: {e}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup
-    
-    await init_db()
+    # Startup — launch DB init as background task so the server port opens immediately.
+    # This prevents Render's "No open ports detected" timeout for slow DB cold-starts.
+    db_task = asyncio.create_task(_background_init_db())
     
     await redis_manager.connect()
     yield
     # Shutdown
     logger.info("Shutting down backend service...")
+    if not db_task.done():
+        db_task.cancel()
     await redis_manager.disconnect()
 
 
