@@ -1,13 +1,14 @@
 import uuid
-from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, func
+from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, Sequence, func
 from sqlalchemy.orm import relationship
 from app.database import Base
 
+tracked_emails_index_seq = Sequence('tracked_emails_index_seq')
 
 class TrackedEmail(Base):
     __tablename__ = "tracked_emails"
 
-    index = Column(Integer, autoincrement=True, unique=True, nullable=False)
+    index = Column(Integer, tracked_emails_index_seq, server_default=tracked_emails_index_seq.next_value(), unique=True, nullable=False)
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     sender_id = Column(String(100), index=True, nullable=False, default="default_sender")
     tracking_token = Column(String(64), unique=True, index=True, nullable=False)

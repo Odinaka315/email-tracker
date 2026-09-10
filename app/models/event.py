@@ -1,13 +1,16 @@
 import uuid
-from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, func
+from sqlalchemy import Column, String, Integer, DateTime, JSON, ForeignKey, Boolean, Sequence, func
 from sqlalchemy.orm import relationship
 from app.database import Base
+
+open_events_index_seq = Sequence('open_events_index_seq')
+click_events_index_seq = Sequence('click_events_index_seq')
 
 
 class OpenEvent(Base):
     __tablename__ = "open_events"
 
-    index = Column(Integer, autoincrement=True, unique=True, nullable=False)
+    index = Column(Integer, open_events_index_seq, server_default=open_events_index_seq.next_value(), unique=True, nullable=False)
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     tracked_email_id = Column(String(36), ForeignKey("tracked_emails.id", ondelete="CASCADE"), nullable=False, index=True)
     
@@ -33,7 +36,7 @@ class OpenEvent(Base):
 class ClickEvent(Base):
     __tablename__ = "click_events"
 
-    index = Column(Integer, autoincrement=True, unique=True, nullable=False)
+    index = Column(Integer, click_events_index_seq, server_default=click_events_index_seq.next_value(), unique=True, nullable=False)
     id = Column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     tracked_email_id = Column(String(36), ForeignKey("tracked_emails.id", ondelete="CASCADE"), nullable=False, index=True)
     
