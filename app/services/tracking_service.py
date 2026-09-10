@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional, Dict, Any
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -37,7 +37,7 @@ async def record_open_event(
     client_ip = get_client_ip(headers, client_host)
     ua_info = parse_user_agent(user_agent_str)
 
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     is_first_open = tracked_email.open_count == 0
 
     # 3. Update TrackedEmail record

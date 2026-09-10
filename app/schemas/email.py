@@ -15,6 +15,7 @@ class TrackedEmailResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    index: int
     sender_id: str
     tracking_token: str
     recipient_email: str
@@ -36,6 +37,7 @@ class OpenEventResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: str
+    index: int
     tracked_email_id: str
     ip_address: Optional[str] = None
     user_agent: Optional[str] = None
