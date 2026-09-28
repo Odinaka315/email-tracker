@@ -14,6 +14,7 @@ from app.services.email_service import (
     generate_tracking_token,
     build_tracking_pixel_url,
     generate_tracking_pixel_html,
+    convert_text_to_html,
     inject_tracking_pixel,
     send_email_via_brevo,
 )
@@ -52,7 +53,7 @@ async def create_tracked_email(
 ):
     """
     Registers a new email for open tracking.
-    Generates tracking token, tracking pixel URL, and optionally injects the pixel tag into provided HTML.
+    Generates tracking token, tracking pixel URL, and converts plain text body or injects the pixel tag into provided HTML.
     """
     token = generate_tracking_token()
     base_url = str(request.base_url).rstrip("/")
@@ -71,7 +72,10 @@ async def create_tracked_email(
     await db.refresh(tracked_email)
 
     injected_html = None
-    if payload.html_body:
+    if payload.body:
+        html_content = convert_text_to_html(payload.body, token=token, base_url=base_url)
+        injected_html = inject_tracking_pixel(html_content, token, base_url)
+    elif payload.html_body:
         injected_html = inject_tracking_pixel(payload.html_body, token, base_url)
 
     res = _format_email_response(tracked_email, base_url)
@@ -82,9 +86,10 @@ async def create_tracked_email(
 @router.post("/send", response_model=TrackedEmailResponse, status_code=201)
 async def send_tracked_email(
     request: Request,
-    recipient_email: str = Form(...),
-    subject: str = Form(...),
-    html_body: str = Form(...),
+    recipient_email: str = Form(..., description="Recipient email address"),
+    subject: str = Form(..., description="Email subject line"),
+    body: Optional[str] = Form(None, description="Normal plain text email body (no HTML syntax needed)"),
+    html_body: Optional[str] = Form(None, description="Optional raw HTML email body"),
     sender_name: str = Form("Email Alerts"),
     sender_email: str = Form("no-reply@example.com"),
     sender_id: str = Form("default_sender"),
@@ -93,12 +98,28 @@ async def send_tracked_email(
 ):
     """
     Sends an email with tracking pixel injected, and optional attachments.
+    Accepts normal plain text in 'body' (automatically formatted into tracked email HTML)
+    or raw HTML in 'html_body'.
     """
+    if not body and not html_body:
+        raise HTTPException(
+            status_code=422,
+            detail="Email body is required. Please provide 'body' as normal text.",
+        )
+
     token = generate_tracking_token()
     base_url = str(request.base_url).rstrip("/")
 
-    # Inject tracking pixel into the provided HTML
-    injected_html = inject_tracking_pixel(html_body, token, base_url)
+    # Prepare HTML content and plain text fallback
+    if body:
+        plain_text = body
+        html_content = convert_text_to_html(body, token=token, base_url=base_url)
+    else:
+        plain_text = None
+        html_content = html_body
+
+    # Inject tracking pixel into HTML
+    injected_html = inject_tracking_pixel(html_content, token, base_url)
 
     # Save to database
     tracked_email = TrackedEmail(
@@ -119,6 +140,7 @@ async def send_tracked_email(
             recipient_email=recipient_email,
             subject=subject,
             html_content=injected_html,
+            text_content=plain_text,
             sender_name=sender_name,
             sender_email=sender_email,
             attachments=attachments,

@@ -19,7 +19,7 @@ def run_simulation():
             "recipient_email": "jane.doe@acme-corp.com",
             "subject": "Q4 Partnership Proposal & Contract",
             "sender_id": "default_sender",
-            "html_body": "<html><body><h2>Hi Jane</h2><p>Please review our proposal attached.</p></body></html>",
+            "body": "Hi Jane,\n\nPlease review our proposal attached.\n\nBest regards,\nAlex",
             "meta_data": {"lead_score": 95, "campaign": "enterprise_outreach"},
         }
         resp = client.post("/api/v1/emails/track", json=payload)

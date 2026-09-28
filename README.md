@@ -59,14 +59,26 @@ Interactive API documentation will be available at:
 
 ## 📡 API Endpoints
 
-### 1. Track an Email
-**`POST /api/v1/emails/track`**
+### 1. Send a Tracked Email
+**`POST /api/v1/emails/send`** (Form-Data)
+Input normal text directly — no HTML syntax required! The backend automatically formats the email into clean HTML and injects the tracking pixel.
+
+- `recipient_email`: `jane@acme.com`
+- `subject`: `Proposal Discussion`
+- `body`: `Hi Jane,\n\nPlease see the proposal.\n\nBest regards,\nAlex`
+- `sender_name`: `Email Alerts` *(optional)*
+- `sender_email`: `no-reply@example.com` *(optional)*
+- `sender_id`: `user_42` *(optional)*
+- `attachments`: File attachments *(optional)*
+
+### 2. Register / Preview a Tracked Email
+**`POST /api/v1/emails/track`** (JSON)
 ```json
 {
   "recipient_email": "jane@acme.com",
   "subject": "Proposal Discussion",
   "sender_id": "user_42",
-  "html_body": "<html><body><p>Hi Jane, please see the proposal.</p></body></html>",
+  "body": "Hi Jane,\n\nPlease see the proposal.\n\nBest regards,\nAlex",
   "meta_data": {"campaign": "q4_enterprise"}
 }
 ```
@@ -79,16 +91,16 @@ Interactive API documentation will be available at:
   "recipient_email": "jane@acme.com",
   "status": "SENT",
   "tracking_pixel_url": "http://localhost:8000/api/v1/track/open/trk_abc123....gif",
-  "injected_html": "<html><body><p>Hi Jane, please see the proposal.</p><img src=\"http://localhost:8000/api/v1/track/open/trk_abc123....gif\" ... />\n</body></html>"
+  "injected_html": "<!DOCTYPE html><html>...<img src=\"http://localhost:8000/api/v1/track/open/trk_abc123....gif\" ... />\n</body></html>"
 }
 ```
 
-### 2. Tracking Pixel Endpoint
+### 3. Tracking Pixel Endpoint
 **`GET /api/v1/track/open/{tracking_token}.gif`**
 - Returns 1x1 transparent GIF with `Cache-Control: no-cache, no-store`.
 - Asynchronously logs the open event and triggers real-time alerts.
 
-### 3. Real-Time Alert WebSocket
+### 4. Real-Time Alert WebSocket
 **`WS /ws/alerts/{sender_id}`** (or `WS /ws/alerts` for all alerts)
 - Emits real-time event when pixel is opened:
 ```json

@@ -46,3 +46,5 @@ venv/
 .pytest_cache/
 .coverage
 htmlcov/
+
+mobile_app/

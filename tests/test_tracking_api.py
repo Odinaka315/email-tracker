@@ -72,3 +72,99 @@ async def test_email_tracking_flow():
         assert stats["total_emails_tracked"] >= 1
         assert stats["total_emails_opened"] >= 1
         assert stats["total_link_clicks"] >= 1
+
+
+def test_convert_text_to_html():
+    from app.services.email_service import convert_text_to_html
+
+    # 1. Plain text with paragraphs and single line breaks
+    text = "Hello Alice,\n\nHow are you doing?\nHere is line 2.\n\nBest,\nBob"
+    html_out = convert_text_to_html(text)
+    assert "<!DOCTYPE html>" in html_out
+    assert "<p style=" in html_out
+    assert "Hello Alice," in html_out
+    assert "How are you doing?<br/>Here is line 2." in html_out
+    assert "Best,<br/>Bob" in html_out
+
+    # 2. HTML escaping of special characters
+    special_text = "Check if 5 < 10 & 20 > 15 with 'quotes' and \"double\""
+    html_out_2 = convert_text_to_html(special_text)
+    assert "5 &lt; 10 &amp; 20 &gt; 15" in html_out_2
+    assert "&quot;double&quot;" in html_out_2
+
+    # 3. Automatic link detection with click tracking
+    link_text = "Visit our docs at https://example.com/docs."
+    html_out_3 = convert_text_to_html(link_text, token="trk_test_123", base_url="http://localhost:8000")
+    assert "/api/v1/track/click/trk_test_123?url=https%3A%2F%2Fexample.com%2Fdocs" in html_out_3
+    # Check that trailing period is outside the anchor tag
+    assert 'https://example.com/docs</a>.' in html_out_3
+
+    # 4. If already full HTML document, preserve it
+    doc = "<html><body>Already HTML</body></html>"
+    assert convert_text_to_html(doc) == doc
+
+
+@pytest.mark.asyncio
+async def test_email_track_with_plain_text():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        plain_body = "Hello John,\n\nWe have updated your invoice.\nVisit https://example.com/invoice to view it."
+        create_resp = await client.post(
+            "/api/v1/emails/track",
+            json={
+                "recipient_email": "john@example.com",
+                "subject": "Invoice Updated",
+                "body": plain_body,
+            },
+        )
+        assert create_resp.status_code == 201
+        data = create_resp.json()
+        assert data["recipient_email"] == "john@example.com"
+        assert "<img src=" in data["injected_html"]
+        assert "Hello John," in data["injected_html"]
+        assert "/api/v1/track/click/" in data["injected_html"]
+
+
+@pytest.mark.asyncio
+async def test_send_tracked_email_with_plain_text():
+    from unittest.mock import patch, AsyncMock
+
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        with patch("app.api.v1.emails.send_email_via_brevo", new_callable=AsyncMock) as mock_send:
+            mock_send.return_value = {"messageId": "msg_123"}
+
+            resp = await client.post(
+                "/api/v1/emails/send",
+                data={
+                    "recipient_email": "jane@example.com",
+                    "subject": "Welcome to our service",
+                    "body": "Hi Jane,\n\nWelcome aboard!\n\nCheers,\nSupport",
+                },
+            )
+            assert resp.status_code == 201
+            data = resp.json()
+            assert data["recipient_email"] == "jane@example.com"
+            assert data["status"] == "SENT"
+            assert "<img src=" in data["injected_html"]
+
+            mock_send.assert_awaited_once()
+            call_kwargs = mock_send.await_args.kwargs
+            assert call_kwargs["recipient_email"] == "jane@example.com"
+            assert call_kwargs["subject"] == "Welcome to our service"
+            assert "<img src=" in call_kwargs["html_content"]
+            assert call_kwargs["text_content"] == "Hi Jane,\n\nWelcome aboard!\n\nCheers,\nSupport"
+
+
+@pytest.mark.asyncio
+async def test_send_tracked_email_missing_body():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.post(
+            "/api/v1/emails/send",
+            data={
+                "recipient_email": "jane@example.com",
+                "subject": "Welcome",
+            },
+        )
+        assert resp.status_code == 422

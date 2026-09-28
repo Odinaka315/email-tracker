@@ -7,7 +7,8 @@ class TrackedEmailCreate(BaseModel):
     recipient_email: str = Field(..., description="Recipient email address")
     subject: Optional[str] = Field(None, description="Email subject line")
     sender_id: Optional[str] = Field("default_sender", description="ID of sender or user account")
-    html_body: Optional[str] = Field(None, description="Raw HTML email content to inject pixel into")
+    body: Optional[str] = Field(None, description="Normal plain text email body (no HTML syntax needed)")
+    html_body: Optional[str] = Field(None, description="Raw HTML email content to inject pixel into (optional alternative)")
     meta_data: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Custom metadata tags")
 
 
