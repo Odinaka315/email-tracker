@@ -88,12 +88,12 @@ async def send_tracked_email(
     request: Request,
     recipient_email: str = Form(..., description="Recipient email address"),
     subject: str = Form(..., description="Email subject line"),
-    body: Optional[str] = Form(None, description="Normal plain text email body (no HTML syntax needed)"),
-    html_body: Optional[str] = Form(None, description="Optional raw HTML email body"),
-    sender_name: str = Form("Email Alerts"),
-    sender_email: str = Form("no-reply@example.com"),
-    sender_id: str = Form("default_sender"),
-    attachments: Optional[List[UploadFile]] = File(None),
+    body: Optional[str] = Form(default=None, description="Normal plain text email body (no HTML syntax needed)"),
+    html_body: Optional[str] = Form(default=None, description="Optional raw HTML email body"),
+    sender_name: str = Form(default="Email Alerts"),
+    sender_email: str = Form(default="nwolisaodinaka5@gmail.com"),
+    sender_id: str = Form(default="default_sender"),
+    attachments: List[UploadFile] = File(default=[]),
     db: AsyncSession = Depends(get_db),
 ):
     """
@@ -143,7 +143,7 @@ async def send_tracked_email(
             text_content=plain_text,
             sender_name=sender_name,
             sender_email=sender_email,
-            attachments=attachments,
+            attachments=attachments if attachments else None,
         )
     except Exception as e:
         # If sending fails, mark it in the DB and raise

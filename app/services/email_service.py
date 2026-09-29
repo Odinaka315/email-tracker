@@ -165,7 +165,7 @@ async def send_email_via_brevo(
     html_content: str,
     text_content: Optional[str] = None,
     sender_name: str = "Email Alerts",
-    sender_email: str = "no-reply@example.com",
+    sender_email: str = "nwolisaodinaka5@gmail.com",
     attachments: Optional[List[UploadFile]] = None,
 ) -> dict:
     """
