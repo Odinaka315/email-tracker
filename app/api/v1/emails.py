@@ -100,6 +100,10 @@ async def send_tracked_email(
     Sends an email with tracking pixel injected, and optional attachments.
     Accepts normal plain text in 'body' (automatically formatted into tracked email HTML)
     or raw HTML in 'html_body'.
+
+    IMPORTANT: We send via Brevo FIRST, then persist to the database only on
+    success. This prevents phantom 'SENT' records for emails that were never
+    actually delivered.
     """
     if not body and not html_body:
         raise HTTPException(
@@ -121,7 +125,28 @@ async def send_tracked_email(
     # Inject tracking pixel into HTML
     injected_html = inject_tracking_pixel(html_content, token, base_url)
 
-    # Save to database
+    # ── Step 1: Send the email via Brevo FIRST ──
+    # If this fails, we return an error WITHOUT saving anything to the DB.
+    try:
+        await send_email_via_brevo(
+            recipient_email=recipient_email,
+            subject=subject,
+            html_content=injected_html,
+            text_content=plain_text,
+            sender_name=sender_name,
+            sender_email=sender_email,
+            attachments=attachments if attachments else None,
+        )
+    except HTTPException:
+        # Re-raise FastAPI HTTPExceptions directly (e.g. 502 from Brevo failure)
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Failed to send email: {str(e)}",
+        )
+
+    # ── Step 2: Persist to DB only after successful send ──
     tracked_email = TrackedEmail(
         sender_id=sender_id,
         tracking_token=token,
@@ -133,23 +158,6 @@ async def send_tracked_email(
     db.add(tracked_email)
     await db.commit()
     await db.refresh(tracked_email)
-
-    # Send the email via Brevo
-    try:
-        await send_email_via_brevo(
-            recipient_email=recipient_email,
-            subject=subject,
-            html_content=injected_html,
-            text_content=plain_text,
-            sender_name=sender_name,
-            sender_email=sender_email,
-            attachments=attachments if attachments else None,
-        )
-    except Exception as e:
-        # If sending fails, mark it in the DB and raise
-        tracked_email.status = "FAILED"
-        await db.commit()
-        raise e
 
     res = _format_email_response(tracked_email, base_url)
     res.injected_html = injected_html
