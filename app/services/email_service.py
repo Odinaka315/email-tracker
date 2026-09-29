@@ -1,3 +1,4 @@
+import logging
 import re
 import html
 import base64
@@ -7,6 +8,8 @@ from typing import Tuple, List, Optional
 import httpx
 from fastapi import UploadFile, HTTPException
 from app.config import settings
+
+logger = logging.getLogger("email_alerts.email_service")
 
 
 def generate_tracking_token() -> str:
@@ -210,9 +213,19 @@ async def send_email_via_brevo(
         response = await client.post(brevo_url, headers=headers, json=payload)
 
     if response.status_code not in (200, 201, 202):
+        logger.error(f"Brevo API error {response.status_code}: {response.text}")
+        detail_msg = "The email delivery service could not deliver this message. Please check the recipient address or try again later."
+        try:
+            err_data = response.json()
+            if isinstance(err_data, dict) and "message" in err_data:
+                msg = str(err_data["message"]).strip()
+                if msg:
+                    detail_msg = f"Email delivery failed: {msg}"
+        except Exception:
+            pass
         raise HTTPException(
             status_code=502,
-            detail=f"Failed to send email via Brevo. Status: {response.status_code}, Body: {response.text}"
+            detail=detail_msg,
         )
 
     return response.json()

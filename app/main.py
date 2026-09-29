@@ -89,10 +89,45 @@ async def http_exception_handler(request: Request, exc: StarletteHTTPException):
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    logger.warning(f"Validation error on {request.method} {request.url.path}: {exc.errors()}")
+    errors = exc.errors()
+    logger.warning(f"Validation error on {request.method} {request.url.path}: {errors}")
+
+    friendly_messages = []
+    field_map = {
+        "recipient_email": "recipient email address",
+        "subject": "email subject",
+        "body": "email body",
+        "html_body": "email body",
+        "sender_name": "sender name",
+        "sender_email": "sender email",
+    }
+
+    for err in errors:
+        loc = err.get("loc", [])
+        field = loc[-1] if loc else "field"
+        friendly_field = field_map.get(str(field), str(field).replace("_", " "))
+
+        err_type = str(err.get("type", ""))
+        if "missing" in err_type:
+            friendly_messages.append(f"Please provide {friendly_field}")
+        else:
+            friendly_messages.append(f"Invalid {friendly_field}")
+
+    seen = set()
+    unique_messages = [m for m in friendly_messages if not (m in seen or seen.add(m))]
+
+    friendly_detail = (
+        ". ".join(unique_messages) + "."
+        if unique_messages
+        else "Email was not sent. Please check all fields and try again."
+    )
+
     return JSONResponse(
         status_code=422,
-        content={"detail": exc.errors()},
+        content={
+            "detail": friendly_detail,
+            "errors": errors,
+        },
     )
 
 

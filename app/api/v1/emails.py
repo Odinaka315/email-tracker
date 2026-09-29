@@ -1,3 +1,4 @@
+import logging
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Form, UploadFile, File
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -20,6 +21,7 @@ from app.services.email_service import (
 )
 
 router = APIRouter(prefix="/emails", tags=["Emails"])
+logger = logging.getLogger("email_alerts.emails")
 
 
 def _format_email_response(email: TrackedEmail, base_url: str = None) -> TrackedEmailResponse:
@@ -141,9 +143,10 @@ async def send_tracked_email(
         # Re-raise FastAPI HTTPExceptions directly (e.g. 502 from Brevo failure)
         raise
     except Exception as e:
+        logger.error(f"Unexpected error while sending email: {e}", exc_info=True)
         raise HTTPException(
-            status_code=502,
-            detail=f"Failed to send email: {str(e)}",
+            status_code=500,
+            detail="Email was not sent successfully. Please try again later.",
         )
 
     # ── Step 2: Persist to DB only after successful send ──
