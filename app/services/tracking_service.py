@@ -105,4 +105,15 @@ async def record_open_event(
         except Exception as e:
             logger.error(f"Failed to publish alert for email {tracked_email.id}: {e}")
 
+        try:
+            from app.services.fcm_service import send_email_opened_push
+            await send_email_opened_push(
+                recipient_email=tracked_email.recipient_email,
+                subject=tracked_email.subject,
+                email_id=str(tracked_email.id),
+                open_count=tracked_email.open_count,
+            )
+        except Exception as e:
+            logger.error(f"Failed to send FCM push for email {tracked_email.id}: {e}")
+
     return tracked_email

@@ -47,4 +47,9 @@ venv/
 .coverage
 htmlcov/
 
+# Firebase & Secrets
+serviceAccountKey.json
+*firebase-adminsdk*.json
+device_tokens.json
+
 mobile_app/
